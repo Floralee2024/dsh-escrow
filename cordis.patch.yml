@@ -1,0 +1,11 @@
+# dsh-escrow bundle patch：把 escrow 插件插入 profile 层栈。
+# 安装：dsh plugin --profile <name> add dsh-escrow（或本地 tarball）
+# 注意：patch 替换整行 config，不深合并；改配置需重述全部字段。
+- insert:
+    - id: escrow
+      name: dsh-escrow
+      config:
+        ttlSec: 30
+        timeoutPolicy: cancel
+        defaultAction: yellow
+        builtinRules: true

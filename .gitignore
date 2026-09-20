@@ -1,0 +1,13 @@
+node_modules/
+*.tgz
+npm-debug.log*
+pnpm-debug.log*
+.e2e-ws/
+.dsh/
+.dsh-escrow/
+coverage/
+dist/
+.DS_Store
+Thumbs.db
+add3.txt
+add4.txt
