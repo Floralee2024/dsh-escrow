@@ -32,7 +32,7 @@ cd D:\BigWorkspace\projects\dsh-escrow
 npm run test:all
 ```
 
-期望：**218 断言全绿**（smoke 104 + taste 43 + integration 71）。若失败，先报告失败项再继续。
+期望：**225 断言全绿**（smoke 107 + taste 43 + integration 75）。若失败，先报告失败项再继续。
 
 ## 审查任务
 

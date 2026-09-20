@@ -1,3 +1,17 @@
+## Current artifact status (v0.3.21)
+
+Historical round sections below refer to the version named in each heading. For the current artifact:
+
+- R6-1 was fixed earlier and remains regression-tested.
+- R6-2 now normalizes the tested quote, glob, and simple assignment forms; full shell expansion remains out of scope.
+- R6-4 is fixed: entries are registered before synchronous settlement, with a pre-abort regression.
+- R8-1 is fixed by read-only legacy mode; /escrow migrate is required before append.
+- R8-2 remains an accepted reporting limitation: main/.bak history can have cross-generation IDs.
+- R8-3 is an intentional metric-view distinction documented in the README.
+- R8-4 is closed; the report exposes the ROI average only.
+- User payload h/m values are preserved as payload_h/payload_m.
+- Current local regression baseline: smoke 107, taste 43, integration 75 (225 total).
+
 # 历轮审查记录（dsh-escrow M1+M2+M7+M8）
 
 > 供第三方审查者核对：这些是历轮内部 code-reviewer 已发现并处理的。请**验证修复是否闭环**、是否有遗漏，并聚焦新角度。

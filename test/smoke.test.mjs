@@ -427,6 +427,16 @@ ok('命令串引号拼接绕过（"AGENTS".md）→ red（R6-2 修复）', () =>
   const r = classifyExec({ name: 'bash', arguments: { command: 'printf x > "AGENTS".md' } }, ctx);
   assert.equal(r.action, 'red');
 });
+ok('命令串 glob 自改目标（AGENTS.m?）→ red', () => {
+  const r = classifyExec({ name: 'bash', arguments: { command: 'echo x > AGENTS.m?' } }, ctx);
+  assert.equal(r.action, 'red');
+  assert.equal(r.ruleId, 'selfmod');
+});
+ok('命令串简单变量展开自改目标（$F.md）→ red', () => {
+  const r = classifyExec({ name: 'bash', arguments: { command: 'F=AGENTS; echo x > $F.md' } }, ctx);
+  assert.equal(r.action, 'red');
+  assert.equal(r.ruleId, 'selfmod');
+});
 ok('selfModification:false → 自改走正常分类（不红）', () => {
   const r = classifyExec({ name: 'fs.write', arguments: { path: 'D:/proj/AGENTS.md' } }, { rules: [], builtinRules: true, defaultAction: 'yellow', selfModification: false });
   assert.equal(r.action, 'yellow');
@@ -545,16 +555,20 @@ ok('哈希链：篡改中间行 → tampered', () => {
     assert.equal(ledger2.integrity.tampered, true);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
-ok('哈希链：旧格式无 h 行 → legacy 且不拒写', () => {
+ok('哈希链：旧格式无 h 行 → legacy 且迁移前只读', () => {
   const dir = mkdtempSync(join(tmpdir(), 'escrow-h-'));
   try {
     writeFileSync(join(dir, 'ledger.jsonl'), JSON.stringify({ t: '2026-01-01T00:00:00.000Z', kind: 'observe', tool: 'old' }) + '\n', 'utf8');
     const ledger = createLedger({ dir });
     assert.equal(ledger.integrity.legacyDetected, true);
     assert.equal(ledger.integrity.tampered, false);
-    ledger.write('observe', { tool: 'new' });
+    assert.equal(ledger.write('observe', { tool: 'new' }), false);
     const lines = readFileSync(join(dir, 'ledger.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l));
-    assert.equal(typeof lines[1].h, 'string'); // 新行带 h
+    assert.equal(lines.length, 1);
+    assert.equal(ledger.migrate().migrated, 1);
+    assert.equal(ledger.write('observe', { tool: 'new' }), true);
+    const migrated = readFileSync(join(dir, 'ledger.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l));
+    assert.equal(typeof migrated[1].h, 'string'); // 迁移后新行带 h
     assert.equal(ledger.integrity.tampered, false);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
@@ -593,6 +607,18 @@ ok('readLedgerLines：.bak 行带 _src 标记（R8-2）', () => {
 });
 
 console.log('\n[M6+ HMAC 锚定]');
+ok('账本 payload.h/m 冲突字段保留为命名空间', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'escrow-payload-'));
+  try {
+    const ledger = createLedger({ dir });
+    ledger.write('observe', { tool: 'bash', h: 'USER_H', m: 'USER_M' });
+    const rec = JSON.parse(readFileSync(join(dir, 'ledger.jsonl'), 'utf8').trim());
+    assert.equal(rec.payload_h, 'USER_H');
+    assert.equal(rec.payload_m, 'USER_M');
+    assert.notEqual(rec.h, 'USER_H');
+    assert.notEqual(rec.m, 'USER_M');
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
 ok('HMAC：写入行带 m 且重载验证通过', () => {
   const dir = mkdtempSync(join(tmpdir(), 'escrow-k-'));
   try {

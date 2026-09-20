@@ -519,6 +519,12 @@ async function run() {
         record('M7 execute 层对被托管自改返回合成结果', !!idSelf && synthSelf.value.stdout.text.includes('escrow_result'));
         record('M7 selfmod.queued 落账', readFileSync(join(dirM7, 'ledger.jsonl'), 'utf8').includes('selfmod.queued'));
 
+        // 24b. 预中止自改也必须落 selfmod.decided（回归 R6-4）
+        const abortCtl = AC();
+        abortCtl.abort();
+        await preM7({ name: 'fs.write', arguments: { path: selfFile, content: 'abort' }, callId: 'm7s-abort', signal: abortCtl.signal }, next);
+        const abortLog = readFileSync(join(dirM7, 'ledger.jsonl'), 'utf8');
+        record('M7 预中止自改 → selfmod.decided 落账', abortLog.includes('"kind":"selfmod.decided"') && abortLog.includes('"via":"abort"'));
         // 25. approve 自改 → selfmod.decided 落账 + 批准后不进品味白名单（never-learn）
         cmdM7.handler({ rawInput: `approve ${idSelf}`, signal: AC().signal });
         await new Promise((r) => setTimeout(r, 80));

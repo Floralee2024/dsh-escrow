@@ -1,8 +1,8 @@
 # Pre-Execution Escrow for Irreversible Agent Actions
 
-## Fail-Closed Deferred Approval with Never-Learn Safety Invariants
+## Fail-Closed Deferred Approval with Pattern-Scoped Never-Learn Invariants
 
-**Artifact:** `dsh-escrow` v0.3.20  
+**Artifact:** dsh-escrow v0.3.21
 **License:** MIT  
 **Status:** reproducible system/artifact paper draft
 
@@ -82,8 +82,7 @@ inspected and reproduced.
 
 ## 2. Problem Definition and Scope
 
-Let a tool call be (a=(n,	heta,s)), where (n) is a tool name, (	heta)
-is its argument object, and (s) is session metadata. The escrow layer maps
+Let a tool call be \(a=(n,\theta,s)\), where \(n\) is a tool name, \(\theta\) is its argument object, and \(s\) is session metadata. The escrow layer maps
 the call to a deterministic classification:
 
 \[
@@ -176,7 +175,7 @@ directories. Matching is case-insensitive under the Windows-oriented policy.
 
 User rules can make an action more restrictive or classify an otherwise
 unmatched action, but a user green rule cannot suppress an intrinsic red match.
-The classifier does not use an AI model for the security decision.
+The classifier does not use an AI model for the security decision. The current normalization covers the tested Windows-oriented command forms, including quoted paths, simple glob markers, and simple shell-variable assignments; full shell parsing, command substitution, aliases, and encoded paths remain outside the claim boundary.
 
 ### 4.3 Non-blocking escrow and safe silence
 
@@ -222,10 +221,7 @@ silently inferred from repeated approvals.
 The ledger is append-only JSONL. Sensitive values are redacted before storage.
 The current implementation supports hash chaining, HMAC authentication,
 rotation, legacy detection, migration, session metadata, and report/reduce
-views. The integrity model is intentionally stated narrowly: it detects
-unnoticed corruption and, with an available key, makes offline recomputation
-harder. It is not a defense against an attacker who controls both the ledger
-and the key.
+views. A legacy-format ledger is read-only until an explicit /escrow migrate operation succeeds; user-supplied h and m fields are preserved under payload_h and payload_m so they cannot overwrite chain fields. The integrity model is intentionally stated narrowly: it detects unnoticed corruption and, with an available key, makes offline recomputation harder. It is not a defense against an attacker who controls both the ledger and the key.
 
 ## 5. Implementation Artifact
 
@@ -253,15 +249,15 @@ implementation failures were found, reproduced, and repaired.
 
 ### 6.1 Current repository verification
 
-The v0.3.20 package exposes three test entry points through `npm run test:all`:
+The v0.3.21 package exposes three test entry points through npm run test:all:
 
 1. classifier, queue, ledger, M7, M8, M6, HMAC and migration smoke tests;
 2. taste/signature state-machine tests;
 3. plugin-level integration tests using a mock Cordis context and a complete
    pre-execute/execute replay path.
 
-The current checked repository reports 104 smoke assertions, 43 taste
-assertions, and 74 integration assertions, for 221 passing assertions. The
+The current checked repository reports 107 smoke assertions, 43 taste
+assertions, and 75 integration assertions, for 225 passing assertions. The
 tests cover encoded invariants such as:
 
 - red classification and sensitive-path detection;
@@ -335,9 +331,10 @@ Even that claim would remain conditional on the tested environment.
 
 The current artifact has five important limitations.
 
-First, the classifier is deterministic but necessarily incomplete. Unknown
-shell syntax, aliases, variable expansion, encoded paths, or a new tool can
-fall outside the rule corpus.
+First, the classifier is deterministic but necessarily incomplete. The tested
+normalization covers quoted paths, simple glob markers, and simple shell-variable
+assignments, but unknown shell syntax, command substitution, aliases, encoded
+paths, or a new tool can fall outside the rule corpus.
 
 Second, the tests are primarily implementation and integration tests. They do
 not provide a broad population estimate of attack success or false positives.
@@ -353,6 +350,9 @@ will always use them correctly.
 
 Fifth, the ledger integrity mechanism has a bounded threat model. It supports
 auditability, not an external tamper-proof log or a trusted hardware root.
+Legacy ledgers require explicit migration before new writes are accepted.
+Rotation intentionally exposes main and backup generations together for review,
+so cross-generation action IDs can make aggregate reports ambiguous.
 
 ## 9. Reproducibility and Responsible Use
 

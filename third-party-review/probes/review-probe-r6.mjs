@@ -97,6 +97,7 @@ function makeCtx(ledgerDir) {
     await pre({ name: 'bash', arguments: { command: 'deploy prod' }, callId: 'g3', signal: AC().signal }, () => Promise.resolve({ kind: 'allow' }));
     const queued = api.queue.pendingList().length;
     out(queued === 0 ? '缺陷确认' : 'OK', 'G3 用户 red 规则 id=builtin-guard 被品味 allow 绕过', `入队=${queued}（0=用户 red 失效）`);
+    api.queue.cancelAll();
   } finally { rmSync(dir, { recursive: true, force: true }); }
 }
 
@@ -105,7 +106,7 @@ function makeCtx(ledgerDir) {
   const dir = tmp();
   try {
     const ctx = makeCtx(dir);
-    plugin.apply(ctx, { ttlSec: 30, timeoutPolicy: 'cancel', defaultAction: 'yellow', builtinRules: true, rules: [], ledgerDir: dir, mode: 'async' });
+    const api = plugin.apply(ctx, { ttlSec: 30, timeoutPolicy: 'cancel', defaultAction: 'yellow', builtinRules: true, rules: [], ledgerDir: dir, mode: 'async' });
     const pre = ctx._listeners.get('tools/pre-execute');
     const ctl = new AbortController();
     ctl.abort(); // 信号在入队前已中止
@@ -114,8 +115,9 @@ function makeCtx(ledgerDir) {
     const hasQueued = ledger.includes('selfmod.queued');
     const hasDecided = ledger.includes('selfmod.decided');
     const hasEscrowDecided = ledger.includes('escrow.decided');
-    out(hasQueued && !hasDecided && hasEscrowDecided ? '缺陷确认' : 'OK',
-      'G4 预中止自改条目：selfmod.decided 漏记（escrow.decided 有）', `selfmod.queued=${hasQueued} selfmod.decided=${hasDecided} escrow.decided=${hasEscrowDecided}`);
+    out(hasQueued && hasDecided && hasEscrowDecided ? '闭环' : '缺陷确认',
+      'G4 预中止自改条目：selfmod.decided 落账', `selfmod.queued=${hasQueued} selfmod.decided=${hasDecided} escrow.decided=${hasEscrowDecided}`);
+    api.queue.cancelAll();
   } finally { rmSync(dir, { recursive: true, force: true }); }
 }
 
@@ -179,13 +181,14 @@ function makeCtx(ledgerDir) {
     const target = join(dir, 'AGENTS.md');
     writeFileSync(target, 'before-content', 'utf8');
     const ctx = makeCtx(dir);
-    plugin.apply(ctx, { ttlSec: 30, timeoutPolicy: 'cancel', defaultAction: 'yellow', builtinRules: true, rules: [], ledgerDir: dir, mode: 'async' });
+    const api = plugin.apply(ctx, { ttlSec: 30, timeoutPolicy: 'cancel', defaultAction: 'yellow', builtinRules: true, rules: [], ledgerDir: dir, mode: 'async' });
     const pre = ctx._listeners.get('tools/pre-execute');
     await pre({ name: 'bash', arguments: { command: `echo pwn > ${target}` }, callId: 'cm72', signal: AC().signal }, () => Promise.resolve({ kind: 'allow' }));
     const ledger = readFileSync(join(dir, 'ledger.jsonl'), 'utf8');
     const queued = ledger.split('\n').find((l) => l.includes('selfmod.queued'));
     const hasSnap = queued ? queued.includes('snapshots') && queued.includes('AGENTS.md') && queued.includes('hash') : false;
     out(hasSnap ? '闭环' : '缺陷确认', 'C-M7-2 命令串自改记录 before 快照 hash', hasSnap ? JSON.parse(queued).snapshots : `selfmod.queued=${!!queued}`);
+    api.queue.cancelAll();
   } finally { rmSync(dir, { recursive: true, force: true }); }
 }
 

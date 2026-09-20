@@ -18,7 +18,9 @@ is secure against every attacker or runtime.
 
 ## Current evidence boundary
 
-The v0.3.20 repository currently contains:
+The v0.3.21 repository currently contains:
+
+The current regression baseline is 107 smoke assertions, 43 taste assertions, and 75 integration assertions (225 total).
 
 - unit, taste-state, and plugin integration tests;
 - deterministic classifier and never-learn regression cases;

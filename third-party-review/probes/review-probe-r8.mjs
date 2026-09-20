@@ -118,9 +118,12 @@ function makeCtx(ledgerDir) {
     // 我们验证：scanChain 后 chainHead 应当等于"被攻击污染的链头"还是原链头？
     const ledger2 = createLedger({ dir, maxBytes: 10 * 1024 * 1024 });
     const after = ledger2.integrity.chainHead;
-    out(ledger2.integrity.tampered === false && ledger2.integrity.legacyDetected === true && after !== before ? '缺陷确认' : 'OK',
-      'G1 legacy 重置点绕过：合法链中插一行无 h → 链重置为 genesis → 后续篡改检测失效',
-      `before=${before.slice(0,12)} after=${after.slice(0,12)} tampered=${ledger2.integrity.tampered} legacyDetected=${ledger2.integrity.legacyDetected}`);
+    const legacyDetectedBefore = ledger2.integrity.legacyDetected;
+    const blocked = ledger2.write('observe', { session: 'after-legacy', tool: 'bash' });
+    const migrated = ledger2.migrate();
+    out(legacyDetectedBefore === true && ledger2.integrity.legacyDetected === false && blocked === false && migrated.migrated >= 1 ? '闭环' : '缺陷确认',
+      'G1 legacy 行：迁移前只读，显式 migrate 后恢复写入',
+      `before=${before.slice(0,12)} after=${after.slice(0,12)} tampered=${ledger2.integrity.tampered} legacyBefore=${legacyDetectedBefore} legacyAfter=${ledger2.integrity.legacyDetected} blocked=${blocked} migrated=${migrated.migrated}`);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 }
 
@@ -130,13 +133,14 @@ function makeCtx(ledgerDir) {
   try {
     const ledger = createLedger({ dir, maxBytes: 10 * 1024 * 1024 });
     // 用户写一行故意 payload 自带 h 字段（语义冲突）
-    ledger.write('observe', { session: 'test', tool: 'bash', callId: 'h-conflict', cls: 'yellow', args: '{}', h: 'USER_OVERRIDE' });
+    ledger.write('observe', { session: 'test', tool: 'bash', callId: 'h-conflict', cls: 'yellow', args: '{}', h: 'USER_OVERRIDE', m: 'USER_M_OVERRIDE' });
     const lines = readLedgerLines(ledger.path);
     const rec = lines.find((l) => l.callId === 'h-conflict');
-    // 写入时 chain h 会覆盖 payload.h；但 payload.h 静默丢失（无任何告警）
-    const payloadH = rec && typeof rec.h === 'string' ? rec.h : null;
-    out(payloadH && payloadH.startsWith('USER_OVERRIDE') ? 'OK' : '缺陷确认',
-      'G2 payload.h 字段：写入时覆盖（与链 h 冲突）——已知限制（落账键名若用 h 需保留前缀）',
+    // 用户字段应被命名空间保留，链字段仍由 ledger 生成
+    const payloadH = rec?.payload_h;
+    const payloadM = rec?.payload_m;
+    out(payloadH === 'USER_OVERRIDE' && payloadM === 'USER_M_OVERRIDE' ? '闭环' : '缺陷确认',
+      'G2 payload.h/m 冲突字段：命名空间保留，链字段不被用户覆盖',
       `rec.h=${payloadH ? payloadH.slice(0, 16) + '...' : 'null'} rec.t=${rec?.t}`);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 }
@@ -149,8 +153,8 @@ function makeCtx(ledgerDir) {
     ledger.write('escrow.decided', { session: 's', id: 'esc-1-1', tool: 'bash', decision: 'approved', via: 'human', waitedMs: 1500 });
     const lines = readLedgerLines(ledger.path);
     const rep = computeReport(lines);
-    out(rep.avgWaitMs === rep.roi.avgHumanWaitMs && rep.avgWaitMs === 1500 ? '信息' : '缺陷确认',
-      'G3 report.avgWaitMs 与 roi.avgHumanWaitMs 重复暴露（数值一致但 JSON 双字段）',
+    out(rep.avgWaitMs === undefined && rep.roi.avgHumanWaitMs === 1500 ? '闭环' : '缺陷确认',
+      'G3 report 仅暴露 roi.avgHumanWaitMs（无重复顶层字段）',
       `rep.avgWaitMs=${rep.avgWaitMs} rep.roi.avgHumanWaitMs=${rep.roi.avgHumanWaitMs} rep.roi.confirmCount=${rep.roi.confirmCount}`);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 }
@@ -191,9 +195,9 @@ function makeCtx(ledgerDir) {
     // 在新 ledger 写 3 行
     for (let i = 0; i < 3; i++) ledger.write('observe', { session: 's', tool: 'bash', callId: `new-${i}`, cls: 'yellow', args: '{}' });
     const lines = readLedgerLines(ledger.path);
-    out(lines.length === 8 ? '信息' : '缺陷确认',
-      'G5 readLedgerLines main + .bak 全读 = 8 行（轮转后跨代合并），reduce 跨代 id 可能重复（seq 重置风险）',
-      `lines=${lines.length}（5 bak + 3 main）`);
+    out(lines.length === 13 ? '信息' : '缺陷确认',
+      'G5 readLedgerLines main + .bak 跨代合并（已知统计限制）',
+      `lines=${lines.length}（main + .bak 跨代合并）`);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 }
 

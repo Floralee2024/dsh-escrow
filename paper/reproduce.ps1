@@ -19,4 +19,9 @@ Write-Output "Running npm run test:all ..."
 npm run test:all
 
 Write-Output ""
+Write-Output "Running review probes ..."
+node third-party-review\probes\review-probe-r6.mjs
+node third-party-review\probes\review-probe-r8.mjs
+
+Write-Output ""
 Write-Output "Artifact check complete."

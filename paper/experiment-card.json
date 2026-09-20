@@ -1,6 +1,6 @@
 {
   "title": "Pre-execution escrow for irreversible agent actions",
-  "version": "1.0",
+  "version": "1.1",
   "research_question": "Under a stated tool and attacker model, does pre-execution escrow prevent unauthorized irreversible actions while preserving acceptable agent progress and operator cost?",
   "intervention": {
     "primary": "execution control mode",
@@ -55,5 +55,32 @@
     "A late original call executes after the escrow item was settled.",
     "A never-learn category becomes automatically whitelisted after repeated approval.",
     "The model can invoke the human approval command through its visible tool surface."
-  ]
+  ],
+  "estimand": "The current artifact estimand is implementation-level behavior under the stated harness and test workload; comparative effectiveness estimands remain unestimated.",
+  "pipeline_eligible": true,
+  "can_establish": [
+    "behavior encoded by repository tests and review probes",
+    "one bounded headless-agent polling behavior"
+  ],
+  "cannot_establish": [
+    "predictive performance or generalization",
+    "causal or comparative security effectiveness",
+    "universal security"
+  ],
+  "gates": {
+    "inputs_defined": true,
+    "targets_defined": true,
+    "metrics_defined": true,
+    "split_verified": false,
+    "selection_frozen_before_eval": false,
+    "version_consistent": true,
+    "explicit_action": false,
+    "action_conditioned_transition_or_outcome": false,
+    "non_degenerate_counterfactuals": false,
+    "common_support": false,
+    "oracle_sanity_check": false,
+    "no_action_baseline": false,
+    "raw_observation_baseline": false,
+    "rollout_or_policy_evaluation": false
+  }
 }

@@ -126,10 +126,10 @@ dsh plugin --profile web add dsh-escrow
 ## 测试
 
 ```bash
-npm test                              # 单元：node test/smoke.test.mjs（104 断言，含攻击样本回归）
+npm test                              # 单元：node test/smoke.test.mjs（107 断言，含攻击样本回归）
 npm run test:taste                    # taste：43 断言
-npm run test:integration              # 插件级集成：74 断言
-npm run test:all                      # 当前总计：221 断言
+npm run test:integration              # 插件级集成：75 断言
+npm run test:all                      # 当前总计：225 断言
 ```
 
 ## 论文与复现

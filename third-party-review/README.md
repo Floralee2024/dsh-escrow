@@ -61,7 +61,7 @@ cd D:\BigWorkspace\projects\dsh-escrow
 npm run test:all      # 等价：smoke + taste + integration 依次跑
 ```
 
-期望基线：**218 断言全绿**（smoke 104 + taste 43 + integration 71）。
+期望基线：**225 断言全绿**（smoke 107 + taste 43 + integration 75）。
 若 `node_modules` 缺失：`pnpm install`（或 `npm install`）。
 端到端（可选，需 dsh 环境 + 真实模型）：见 `findings-log.md` 的实证记录。
 

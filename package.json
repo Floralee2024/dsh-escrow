@@ -1,6 +1,6 @@
 {
   "name": "dsh-escrow",
-  "version": "0.3.20",
+  "version": "0.3.21",
   "description": "延迟执行窗口：把 agent 的不可逆动作放进托管队列，批准才交割，超时默认拒绝。Deferred execution window (escrow) for DeepSeek Harness.",
   "type": "module",
   "main": "lib/index.mjs",
