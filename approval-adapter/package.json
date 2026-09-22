@@ -1,0 +1,24 @@
+{
+  "name": "dsh-escrow-approval-adapter",
+  "version": "0.1.0",
+  "private": false,
+  "description": "Local structured approval UI adapter for dsh-escrow.",
+  "type": "module",
+  "bin": {
+    "dsh-escrow-approval-adapter": "bin/dsh-escrow-approval-adapter.mjs"
+  },
+  "scripts": {
+    "start": "node bin/dsh-escrow-approval-adapter.mjs",
+    "test": "node test/server.test.mjs"
+  },
+  "files": [
+    "bin",
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  }
+}

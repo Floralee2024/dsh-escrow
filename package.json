@@ -1,14 +1,16 @@
 {
   "name": "dsh-escrow",
-  "version": "0.3.21",
+  "version": "0.3.25",
   "description": "延迟执行窗口：把 agent 的不可逆动作放进托管队列，批准才交割，超时默认拒绝。Deferred execution window (escrow) for DeepSeek Harness.",
   "type": "module",
   "main": "lib/index.mjs",
   "scripts": {
     "test": "node test/smoke.test.mjs",
-    "test:all": "node test/smoke.test.mjs && node test/taste.test.mjs && node test/plugin.integration.test.mjs",
+    "test:all": "node test/smoke.test.mjs && node test/taste.test.mjs && node test/plugin.integration.test.mjs && node test/host-approval.integration.test.mjs && node test/external-side-effects.audit.test.mjs && node test/approval-adapter.integration.test.mjs && node approval-adapter/test/server.test.mjs",
     "test:taste": "node test/taste.test.mjs",
-    "test:integration": "node test/plugin.integration.test.mjs"
+    "test:integration": "node test/plugin.integration.test.mjs",
+    "test:host": "node test/host-approval.integration.test.mjs",
+    "test:side-effects": "node test/external-side-effects.audit.test.mjs"
   },
   "exports": {
     ".": "./lib/index.mjs",
@@ -23,13 +25,15 @@
     "lib",
     "cordis.patch.yml",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "approval-adapter"
   ],
   "peerDependencies": {
     "@deepseek-ai/cordis": "^4.0.1",
     "@deepseek-ai/dsh-commands": "^0.1.0-rc.8",
     "@deepseek-ai/dsh-home-paths": "^0.1.0-rc.8",
-    "@deepseek-ai/dsh-tools": "^0.1.0-rc.8"
+    "@deepseek-ai/dsh-tools": "^0.1.0-rc.8",
+    "@deepseek-ai/dsh-user-approval": "^0.1.0-rc.6"
   },
   "keywords": [
     "dsh",
@@ -42,6 +46,14 @@
     "guardrail"
   ],
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Floralee2024/dsh-escrow.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Floralee2024/dsh-escrow/issues"
+  },
+  "homepage": "https://github.com/Floralee2024/dsh-escrow#readme",
   "dependencies": {
     "@deepseek-ai/schemastery": "3.18.1"
   }

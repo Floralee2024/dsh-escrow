@@ -282,7 +282,9 @@ async function run() {
     {
       const ctxM2 = makeCtx(dir);
       const apiM2 = plugin.apply(ctxM2, {
-        ttlSec: 30, timeoutPolicy: 'cancel', defaultAction: 'yellow', builtinRules: true, rules: [], ledgerDir: dir
+        ttlSec: 30, timeoutPolicy: 'cancel', defaultAction: 'yellow', builtinRules: true,
+        rules: [{ id: 'learn-red', tools: ['bash'], args: [{ key: 'command', pattern: '^npm test' }], action: 'red' }],
+        ledgerDir: dir
       });
       const preM2 = ctxM2._listeners.get('tools/pre-execute');
       const cmdM2 = ctxM2._commands.find((c) => c.name === 'escrow');
@@ -301,14 +303,14 @@ async function run() {
 
       // 17. 学习：forget 白名单后 approve 同签名 ×2 → 白名单冷却中
       cmdM2.handler({ rawInput: 'forget git push origin <BRANCH>', signal: AC().signal });
-      await preM2({ name: 'bash', arguments: { command: 'git push origin main' }, callId: 'm2l1', signal: AC().signal }, next);
+      await preM2({ name: 'bash', arguments: { command: 'npm test' }, callId: 'm2l1', signal: AC().signal }, next);
       const idL1 = cmdM2.handler({ rawInput: 'pending', signal: AC().signal }).text.match(/esc-\d+-\d+/)[0];
       cmdM2.handler({ rawInput: `approve ${idL1}`, signal: AC().signal });
-      await preM2({ name: 'bash', arguments: { command: 'git push origin main' }, callId: 'm2l2', signal: AC().signal }, next);
+      await preM2({ name: 'bash', arguments: { command: 'npm test' }, callId: 'm2l2', signal: AC().signal }, next);
       const idL2 = cmdM2.handler({ rawInput: 'pending', signal: AC().signal }).text.match(/esc-\d+-\d+/)[0];
       cmdM2.handler({ rawInput: `approve ${idL2}`, signal: AC().signal });
       const alText = cmdM2.handler({ rawInput: 'allowlist', signal: AC().signal }).text;
-      record('M2 批准×2 → 白名单条目冷却中', alText.includes('git push origin <BRANCH>') && alText.includes('cooling'));
+      record('M2 批准×2 → 白名单条目冷却中', alText.includes('npm test') && alText.includes('cooling'));
 
       // 18. never-learn 签名不被学习
       await preM2({ name: 'bash', arguments: { command: 'rm -rf /tmp/x' }, callId: 'm2nl', signal: AC().signal }, next);
@@ -372,12 +374,17 @@ async function run() {
       const cmdImp = ctxImp._commands.find((c) => c.name === 'escrow');
       const imp = cmdImp.handler({ rawInput: `import ${packPath}`, signal: AC().signal });
       record('M2 import 品味包成功', imp.kind === 'success' && imp.text.includes('已导入'));
-      record('M2 导入条目为 pending-review（不立即生效）', apiImp.taste.snapshot().allowlist.some((e) => e.signature === 'git push origin <BRANCH>' && e.status === 'pending-review'));
+      record('M2 导入条目为 pending-review（不立即生效）', apiImp.taste.snapshot().allowlist.some((e) => e.signature === 'npm test' && e.status === 'pending-review'));
 
       // 22. 安全：品味 allow 不覆盖内置敏感路径（签名粒度无法区分具体敏感形态 → 写 .env 仍托管）
       cmdM2.handler({ rawInput: 'allow fs.write(content,path)', signal: AC().signal });
       await preM2({ name: 'fs.write', arguments: { path: 'C:/proj/.env', content: 'x' }, callId: 'm2sens', signal: AC().signal }, next);
       record('M2 品味 allow 不覆盖内置敏感路径（写 .env 仍托管）', cmdM2.handler({ rawInput: 'pending', signal: AC().signal }).text.includes('待决'));
+
+      // critical-red 仍可由用户显式 /escrow allow 例外放行；自动学习仍不会加入。
+      cmdM2.handler({ rawInput: 'allow npm publish', signal: AC().signal });
+      const externalManual = await preM2({ name: 'bash', arguments: { command: 'npm publish' }, callId: 'external-hard-red', signal: AC().signal }, next);
+      record('critical-red 发布动作仅允许显式手动 allow', externalManual.kind === 'allow' && !cmdM2.handler({ rawInput: 'pending', signal: AC().signal }).text.includes('npm publish'));
 
       // 23a. LOW-1：用户显式 red 规则不容品味 allow 覆盖（显式配置 > 隐式习得，冲突时保守拒绝）
       const ctxUR = makeCtx(dir);
@@ -406,12 +413,13 @@ async function run() {
       record('R6 LOW 修复：用户 red id 伪装 builtin-* 前缀仍不容品味覆盖', cmdBG.handler({ rawInput: 'pending', signal: AC().signal }).text.includes('待决'));
     }
 
+    const dirR3 = mkdtempSync(join(tmpdir(), 'escrow-intg-r3-'));
     // ===== round-3 回归（第三方独立审查修复固化，见 third-party-review/review-report-r3-2026-08-29.md）=====
 
     // 23. C1 闭环补强：approve all 同品味签名 2 实例 → 两个都真实重放执行（旧版只断言回执文本）
     {
-      const ctxC1 = makeCtx(dir);
-      plugin.apply(ctxC1, { ttlSec: 30, timeoutPolicy: 'cancel', defaultAction: 'yellow', builtinRules: true, rules: [], ledgerDir: dir });
+      const ctxC1 = makeCtx(dirR3);
+      plugin.apply(ctxC1, { ttlSec: 30, timeoutPolicy: 'cancel', defaultAction: 'yellow', builtinRules: true, rules: [], ledgerDir: dirR3 });
       const preC1 = ctxC1._listeners.get('tools/pre-execute');
       const cmdC1 = ctxC1._commands.find((c) => c.name === 'escrow');
       await preC1({ name: 'bash', arguments: { command: 'git push origin main' }, callId: 'c1a', signal: AC().signal }, next);
@@ -423,8 +431,8 @@ async function run() {
 
     // 24. C4 闭环补强：release + async 超时 → 自动重放，条目不卡"执行中"（旧版无用例）
     {
-      const ctxC4 = makeCtx(dir);
-      const apiC4 = plugin.apply(ctxC4, { ttlSec: 1, timeoutPolicy: 'release', defaultAction: 'yellow', builtinRules: true, rules: [], ledgerDir: dir });
+      const ctxC4 = makeCtx(dirR3);
+      const apiC4 = plugin.apply(ctxC4, { ttlSec: 1, timeoutPolicy: 'release', defaultAction: 'yellow', builtinRules: true, rules: [], ledgerDir: dirR3 });
       const preC4 = ctxC4._listeners.get('tools/pre-execute');
       await preC4({ name: 'bash', arguments: { command: 'git push origin main' }, callId: 'c4a', signal: AC().signal }, next);
       const idC4 = apiC4.queue.pendingList()[0]?.id;
@@ -435,8 +443,8 @@ async function run() {
 
     // 25. HIGH-1a：已拒绝（settle）的条目，迟到的原始调用到达 execute 层不得裸执行
     {
-      const ctxH1 = makeCtx(dir);
-      const apiH1 = plugin.apply(ctxH1, { ttlSec: 30, timeoutPolicy: 'cancel', defaultAction: 'yellow', builtinRules: true, rules: [], ledgerDir: dir });
+      const ctxH1 = makeCtx(dirR3);
+      const apiH1 = plugin.apply(ctxH1, { ttlSec: 30, timeoutPolicy: 'cancel', defaultAction: 'yellow', builtinRules: true, rules: [], ledgerDir: dirR3 });
       const preH1 = ctxH1._listeners.get('tools/pre-execute');
       const exeH1 = ctxH1._listeners.get('tools/execute');
       const execH1 = { name: 'bash', arguments: { command: 'git push origin main' }, callId: 'h1a', signal: AC().signal };
@@ -450,8 +458,8 @@ async function run() {
 
     // 26. HIGH-1b：async 批准重放后，迟到的原始调用不得再执行（防双执行）
     {
-      const ctxH2 = makeCtx(dir);
-      const apiH2 = plugin.apply(ctxH2, { ttlSec: 30, timeoutPolicy: 'cancel', defaultAction: 'yellow', builtinRules: true, rules: [], ledgerDir: dir });
+      const ctxH2 = makeCtx(dirR3);
+      const apiH2 = plugin.apply(ctxH2, { ttlSec: 30, timeoutPolicy: 'cancel', defaultAction: 'yellow', builtinRules: true, rules: [], ledgerDir: dirR3 });
       const preH2 = ctxH2._listeners.get('tools/pre-execute');
       const exeH2 = ctxH2._listeners.get('tools/execute');
       const cmdH2 = ctxH2._commands.find((c) => c.name === 'escrow');
@@ -467,8 +475,8 @@ async function run() {
 
     // 27. HIGH-2：argsSnapshot 深拷贝——入队后下游改写 arguments，重放仍按审批时快照执行
     {
-      const ctxH3 = makeCtx(dir);
-      const apiH3 = plugin.apply(ctxH3, { ttlSec: 30, timeoutPolicy: 'cancel', defaultAction: 'yellow', builtinRules: true, rules: [], ledgerDir: dir });
+      const ctxH3 = makeCtx(dirR3);
+      const apiH3 = plugin.apply(ctxH3, { ttlSec: 30, timeoutPolicy: 'cancel', defaultAction: 'yellow', builtinRules: true, rules: [], ledgerDir: dirR3 });
       const preH3 = ctxH3._listeners.get('tools/pre-execute');
       const cmdH3 = ctxH3._commands.find((c) => c.name === 'escrow');
       const argsH3 = { command: 'git push origin main' };
@@ -482,8 +490,8 @@ async function run() {
 
     // 28. MEDIUM-1：sync 模式同签名并发去重——一次批准只执行一次，去重调用 deny 且不重复记账
     {
-      const ctxM1 = makeCtx(dir);
-      const apiM1 = plugin.apply(ctxM1, { ttlSec: 30, timeoutPolicy: 'cancel', defaultAction: 'yellow', builtinRules: true, rules: [], ledgerDir: dir, mode: 'sync' });
+      const ctxM1 = makeCtx(dirR3);
+      const apiM1 = plugin.apply(ctxM1, { ttlSec: 30, timeoutPolicy: 'cancel', defaultAction: 'yellow', builtinRules: true, rules: [], ledgerDir: dirR3, mode: 'sync' });
       const preM1 = ctxM1._listeners.get('tools/pre-execute');
       let n1 = 0; let n2 = 0;
       const p1 = preM1({ name: 'bash', arguments: { command: 'git push origin main' }, callId: 'm1s1', signal: AC().signal }, () => { n1 += 1; return Promise.resolve({ kind: 'allow' }); });
@@ -496,6 +504,7 @@ async function run() {
       record('round3 MEDIUM-1：sync 去重一次批准只执行一次', pendM1 === 1 && n1 === 1 && n2 === 0 && r1.kind === 'allow' && r2.kind === 'deny' && r2.reason.includes('不重复执行'), `pending=${pendM1} n1=${n1} n2=${n2} dup=${r2.kind}`);
     }
 
+    rmSync(dirR3, { recursive: true, force: true });
     // ===== M7 自改治理（独立目录隔离品味状态，避免与 M2 手动 allow 的 fs.write 冲突）=====
     {
       const dirM7 = mkdtempSync(join(tmpdir(), 'escrow-intg-m7-'));

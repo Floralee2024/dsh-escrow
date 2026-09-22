@@ -11,3 +11,7 @@ dist/
 Thumbs.db
 add3.txt
 add4.txt
+*.log
+.env
+.env.*
+!.env.example

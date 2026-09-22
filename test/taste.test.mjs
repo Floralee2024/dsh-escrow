@@ -60,8 +60,8 @@ console.log('\n[不可学习名单]');
 ok('rm -rf → 不可学习', () => {
   assert.ok(neverLearnReason('bash', { command: 'rm -rf /tmp/x' }));
 });
-ok('普通 git push → 可学习（品味习得要学得会它）', () => {
-  assert.equal(neverLearnReason('bash', { command: 'git push origin main' }), null);
+ok('普通 git push → 永不自动学习', () => {
+  assert.ok(neverLearnReason('bash', { command: 'git push origin main' }));
 });
 ok('git push --force → 不可学习（破坏性 + force）', () => {
   assert.ok(neverLearnReason('bash', { command: 'git push origin main --force' }));
@@ -135,8 +135,8 @@ ok('批准 1 次 → learning，check 不命中', () => {
   const dir = mkdtempSync(join(tmpdir(), 'taste-'));
   try {
     const store = createTasteStore({ dir });
-    const sig = 'git push origin <BRANCH>';
-    const args = { command: 'git push origin main' };
+    const sig = 'npm test';
+    const args = { command: 'npm test' };
     const r = store.recordDecision(sig, true, { toolName: 'bash', args });
     assert.equal(r.learned, true);
     assert.equal(r.status, 'learning');
@@ -148,8 +148,8 @@ ok('批准 2 次 → cooling；冷却期内 check 仍不命中（P7 防疲劳固
   try {
     let t = 1000000;
     const store = createTasteStore({ dir, now: () => t });
-    const sig = 'git push origin <BRANCH>';
-    const args = { command: 'git push origin main' };
+    const sig = 'npm test';
+    const args = { command: 'npm test' };
     store.recordDecision(sig, true, { toolName: 'bash', args });
     const r2 = store.recordDecision(sig, true, { toolName: 'bash', args });
     assert.equal(r2.status, 'cooling');
@@ -162,8 +162,8 @@ ok('冷却期满 → check 惰性晋升 active → allow', () => {
   try {
     let t = 1000000;
     const store = createTasteStore({ dir, now: () => t, cooldownHours: 24 });
-    const sig = 'git push origin <BRANCH>';
-    const args = { command: 'git push origin main' };
+    const sig = 'npm test';
+    const args = { command: 'npm test' };
     store.recordDecision(sig, true, { toolName: 'bash', args });
     store.recordDecision(sig, true, { toolName: 'bash', args });
     t += 25 * 3600 * 1000; // +25h
@@ -174,8 +174,8 @@ ok('拒绝 2 次 → 黑名单即时生效（无冷却期）', () => {
   const dir = mkdtempSync(join(tmpdir(), 'taste-'));
   try {
     const store = createTasteStore({ dir });
-    const sig = 'npm publish <STR>';
-    const args = { command: 'npm publish --dry-run' };
+    const sig = 'npm test';
+    const args = { command: 'npm test' };
     store.recordDecision(sig, false, { toolName: 'bash', args });
     assert.equal(store.check(sig), null);
     store.recordDecision(sig, false, { toolName: 'bash', args });
