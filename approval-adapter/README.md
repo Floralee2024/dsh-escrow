@@ -25,3 +25,6 @@ MVP 使用 dsh-user-approval 当前稳定的 `allowed-once` / `rejected` 结果�
 ```
 
 adapter 断线、超时、未知结果均 fail-closed。当前实现的待审批状态保存在内存中；服务重启会使未完成请求安全拒绝。
+
+
+When started normally, the adapter automatically opens the local approval page when a new request arrives and no page has been seen recently. Use the --no-open flag in headless environments and open the printed URL manually. Browser opening is best-effort only and never approves an action.

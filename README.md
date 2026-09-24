@@ -4,7 +4,7 @@
 
 `dsh-escrow` is a plugin for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness). It classifies tool calls before execution, places high-risk actions in an escrow window, and releases them only after an explicit decision. Silence, timeout, adapter failure, and unknown outcomes do not release an action.
 
-> **Current release: v0.3.25.** This repository is a system/artifact prototype. Its tests document implemented invariants and exercised behaviors; they do not prove universal security, production-scale effectiveness, or safety against every attacker.
+> **Current release: v0.3.26.** This repository is a system/artifact prototype. Its tests document implemented invariants and exercised behaviors; they do not prove universal security, production-scale effectiveness, or safety against every attacker.
 
 ## What it provides
 
@@ -35,7 +35,7 @@ Restart the dsh profile after installing or changing the plugin. If you install 
 
 ## Quick start: local approval adapter
 
-The adapter is an MVP replacement approval surface. It binds to loopback, keeps pending requests in memory, and supports the two stable one-shot outcomes currently used by the host protocol: `allowed-once` and `rejected`.
+The adapter is an MVP replacement approval surface. It binds to loopback, keeps pending requests in memory, supports the two stable one-shot outcomes currently used by the host protocol (`allowed-once` and `rejected`), and automatically opens the local approval page when a new request arrives if no approval page is currently visible.
 
 Start it from the repository root:
 
@@ -43,7 +43,7 @@ Start it from the repository root:
 node approval-adapter/bin/dsh-escrow-approval-adapter.mjs --port 3099
 ```
 
-The process prints a tokenized local URL. Open that URL in a browser. Do not expose the adapter on a LAN or public interface.
+The adapter attempts to open the tokenized local URL automatically. If the environment is headless or the launcher is unavailable, open the printed local URL manually. Do not expose the adapter on a LAN or public interface.
 
 Configure the dsh profile without committing the token:
 

@@ -1,9 +1,12 @@
 import http from 'node:http';
+import { spawn } from 'node:child_process';
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 
 const DEFAULT_HOST = '127.0.0.1';
 const DEFAULT_PORT = 3099;
 const DEFAULT_TTL_MS = 300000;
+const DEFAULT_UI_PRESENCE_MS = 5000;
+const DEFAULT_AUTO_OPEN_COOLDOWN_MS = 1000;
 const MAX_BODY_BYTES = 256 * 1024;
 const OUTCOMES = new Set(['allowed-once', 'rejected']);
 const DETAIL_KEYS = ['operation', 'target', 'remote', 'branch', 'url', 'database', 'resource', 'permissionScope', 'tool'];
@@ -110,6 +113,36 @@ function safeEqual(a, b) {
   return left.length === right.length && timingSafeEqual(left, right);
 }
 
+/**
+ * Open the local approval page in the user's browser.
+ *
+ * WSL has no native browser process, so use Windows interop there. Opening
+ * the page must never decide or release an approval.
+ */
+export function openApprovalBrowser(url, options = {}) {
+  const spawnImpl = options.spawnImpl || spawn;
+  const isWsl = options.isWsl ?? Boolean(process.env.WSL_INTEROP || process.env.WSL_DISTRO_NAME);
+  const platform = options.platform || process.platform;
+  const command = isWsl || platform === 'win32' ? 'cmd.exe' : platform === 'darwin' ? 'open' : 'xdg-open';
+  const args = isWsl || platform === 'win32' ? ['/c', 'start', '', url] : [url];
+  return new Promise((resolve, reject) => {
+    let child;
+    try {
+      child = spawnImpl(command, args, { detached: true, stdio: 'ignore', windowsHide: true });
+    } catch (error) {
+      reject(error);
+      return;
+    }
+    child?.unref?.();
+    if (typeof child?.once !== 'function') {
+      resolve(true);
+      return;
+    }
+    child.once('error', reject);
+    child.once('spawn', () => resolve(true));
+  });
+}
+
 function page() {
   return `<!doctype html>
 <html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -187,8 +220,27 @@ export function startApprovalAdapter(options = {}) {
   const port = Number.isFinite(Number(options.port)) ? Number(options.port) : DEFAULT_PORT;
   const ttlMs = Math.max(1000, Number(options.ttlMs) || DEFAULT_TTL_MS);
   const token = String(options.token || randomBytes(24).toString('hex'));
+  const autoOpen = options.autoOpen === true;
+  const uiPresenceMs = Math.max(1000, Number(options.uiPresenceMs) || DEFAULT_UI_PRESENCE_MS);
+  const autoOpenCooldownMs = Math.max(0, Number(options.autoOpenCooldownMs) || DEFAULT_AUTO_OPEN_COOLDOWN_MS);
+  const openBrowser = options.openBrowser || ((url) => openApprovalBrowser(url));
   const records = new Map();
+  let uiLastSeenAt = 0;
+  let lastAutoOpenAt = 0;
+  let approvalUrl = '';
   const remove = (id, record) => { if (records.get(id) === record) records.delete(id); };
+  const maybeAutoOpen = () => {
+    if (!autoOpen || !approvalUrl) return;
+    const now = Date.now();
+    if (now - uiLastSeenAt <= uiPresenceMs || now - lastAutoOpenAt <= autoOpenCooldownMs) return;
+    lastAutoOpenAt = now;
+    console.log('[dsh-escrow-approval-adapter] auto-open attempt');
+    Promise.resolve(openBrowser(approvalUrl))
+      .then(() => console.log('[dsh-escrow-approval-adapter] auto-open requested'))
+      .catch((error) => {
+        console.error('[dsh-escrow-approval-adapter] auto-open failed: ' + (error instanceof Error ? error.message : String(error)));
+      });
+  };
   const auth = (req) => {
     const header = req.headers.authorization || '';
     return header.startsWith('Bearer ') && safeEqual(header.slice(7), token);
@@ -200,6 +252,7 @@ export function startApprovalAdapter(options = {}) {
     if (!auth(req)) return json(res, 401, { error: 'unauthorized' });
     try {
       if (req.method === 'GET' && url.pathname === '/v1/approvals') {
+        uiLastSeenAt = Date.now();
         return json(res, 200, { approvals: [...records.values()].filter((record) => record.state === 'pending').map(publicRecord) });
       }
       if (req.method === 'POST' && url.pathname === '/v1/approvals') {
@@ -208,6 +261,7 @@ export function startApprovalAdapter(options = {}) {
         if (existing) return json(res, 200, publicRecord(existing));
         const record = createRecord(request, ttlMs, remove);
         records.set(request.approvalId, record);
+        maybeAutoOpen();
         return json(res, 201, publicRecord(record));
       }
       const match = url.pathname.match(/^\/v1\/approvals\/([^/]+)(?:\/(wait|decision))?$/);
@@ -237,12 +291,13 @@ export function startApprovalAdapter(options = {}) {
       server.removeListener('error', reject);
       const address = server.address();
       const actualPort = typeof address === 'object' && address ? address.port : port;
+      approvalUrl = 'http://' + host + ':' + actualPort + '/?token=' + encodeURIComponent(token);
       resolve({
         server,
         host,
         port: actualPort,
         token,
-        url: `http://${host}:${actualPort}/?token=${encodeURIComponent(token)}`,
+        url: approvalUrl,
         close: () => new Promise((done) => server.close(() => done()))
       });
     });

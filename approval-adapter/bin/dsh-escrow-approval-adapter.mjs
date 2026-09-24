@@ -11,9 +11,11 @@ const runtime = await startApprovalAdapter({
   host: value('--host', '127.0.0.1'),
   port: Number(value('--port', 3099)),
   ttlMs: Number(value('--ttl-ms', 300000)),
-  token: value('--token', '')
+  token: value('--token', process.env.DSH_ESCROW_APPROVAL_TOKEN || ''),
+  autoOpen: !args.includes('--no-open')
 });
 console.log(`[dsh-escrow-approval-adapter] listening at ${runtime.url}`);
+console.log('[dsh-escrow-approval-adapter] approval page auto-open: ' + (args.includes('--no-open') ? 'disabled' : 'enabled'));
 console.log('[dsh-escrow-approval-adapter] MVP choices: allowed-once / rejected; fail-closed on timeout.');
 
 const stop = async () => {
